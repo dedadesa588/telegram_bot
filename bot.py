@@ -121,7 +121,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Обработчик команды /farm
 async def farm(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-Outside, [13.09.2025 2:53]
 user = update.effective_user
     chat = update.effective_chat
     
