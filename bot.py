@@ -21,7 +21,7 @@ MIN_STARS = 1
 MAX_STARS = 2
 
 # Функция для проверки является ли пользователь администратором
-async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int) -> bool:
+async def is_admin(context: ContextTypes.DEFAULT_TYPE, user_id: int, chat_id: int) -> bool:
     try:
         chat_member = await context.bot.get_chat_member(chat_id, user_id)
         return chat_member.status in ['administrator', 'creator']
@@ -95,7 +95,7 @@ def update_user(user_id, chat_id, **kwargs):
 
 # Расчет стоимости улучшения
 def get_upgrade_cost(level):
-    return level * 5  # Уменьшил стоимость улучшения
+    return level * 5
 
 # Проверка времени для фарма
 def can_farm(last_farm_time):
@@ -122,6 +122,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     get_user(user.id, chat.id, user.username, user.first_name)
+    
     keyboard = [
         [InlineKeyboardButton("🌟 Профиль", callback_data=f"profile_{user.id}")],
         [InlineKeyboardButton("🏆 Топ игроков", callback_data="toplist")],
@@ -129,7 +130,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     # Добавляем кнопку для админов
-    if await is_admin(update, context, user.id, chat.id):
+    if await is_admin(context, user.id, chat.id):
         keyboard.append([InlineKeyboardButton("🔄 Сбросить статистику (Admin)", callback_data="admin_reset")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -151,7 +152,7 @@ async def reset_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # Проверяем права администратора
-    if not await is_admin(update, context, user.id, chat.id):
+    if not await is_admin(context, user.id, chat.id):
         await update.message.reply_text("❌ Только администраторы могут сбрасывать статистику!")
         return
     
@@ -316,14 +317,14 @@ async def toplist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(top_text, reply_markup=reply_markup)
 
 # Обработчик подтверждения сброса
-async def handle_confirm_reset(query, user, chat):
-    # Проверяем права администратора
-    if not await is_admin(query, query._context, user.id, chat.id):
-        await query.answer("❌ Только администраторы могут сбрасывать статистику!", show_alert=True)
-        return
-    
+async def handle_confirm_reset(query, user, chat, context):
     # Получаем ID чата из callback_data
     chat_id = int(query.data.split('_')[-1])
+    
+    # Проверяем права администратора
+    if not await is_admin(context, user.id, chat_id):
+        await query.answer("❌ Только администраторы могут сбрасывать статистику!", show_alert=True)
+        return
     
     # Сбрасываем статистику
     reset_all_stats(chat_id)
@@ -345,6 +346,33 @@ async def handle_cancel_reset(query):
         ])
     )
 
+# Обработчик админского сброса через кнопку
+async def handle_admin_reset(query, context):
+    user = query.from_user
+    chat = query.message.chat
+    
+    # Проверяем права администратора
+    if not await is_admin(context, user.id, chat.id):
+        await query.answer("❌ Только администраторы могут сбрасывать статистику!", show_alert=True)
+        return
+    
+    # Создаем клавиатуру с подтверждением
+    keyboard = [
+        [InlineKeyboardButton("✅ Да, сбросить всё", callback_data=f"confirm_reset_{chat.id}")],
+        [InlineKeyboardButton("❌ Отмена", callback_data="cancel_reset")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.message.edit_text(
+        "⚠️ ВНИМАНИЕ! Вы уверены что хотите сбросить ВСЮ статистику?\n\n"
+        "Это действие:\n"
+        "• Обнулит все звёзды у всех игроков\n"
+        "• Сбросит все уровни и множители\n"
+        "• Удалит всю историю в этом чате\n\n"
+        "Действие необратимо!",
+        reply_markup=reply_markup
+    )
+
 # Обработчик callback запросов
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -361,10 +389,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await handle_toplist(query, user, chat)
         return
     elif callback_data == "admin_reset":
-        await reset_stats(query, context)
+        await handle_admin_reset(query, context)
         return
     elif callback_data.startswith("confirm_reset_"):
-        await handle_confirm_reset(query, user, chat)
+        await handle_confirm_reset(query, user, chat, context)
         return
     elif callback_data == "cancel_reset":
         await handle_cancel_reset(query)
@@ -449,7 +477,8 @@ async def handle_profile(query, user, chat):
         f"⏰ {farm_status}",
         reply_markup=reply_markup
     )
-    # Обработчик фарма
+
+# Обработчик фарма
 async def handle_farm(query, user, chat):
     user_data = get_user(user.id, chat.id, user.username, user.first_name)
     last_farm_time = user_data[7]
@@ -494,7 +523,7 @@ async def handle_upgrade(query, user, chat):
     if stars >= upgrade_cost:
         new_stars = stars - upgrade_cost
         new_level = level + 1
-        new_multiplier = round(1.0 + (new_level - 1) * 0.1, 1)  # +0.1 за уровень
+        new_multiplier = round(1.0 + (new_level - 1) * 0.1, 1)
         
         update_user(user.id, chat.id, stars=new_stars, level=new_level, multiplier=new_multiplier)
         
