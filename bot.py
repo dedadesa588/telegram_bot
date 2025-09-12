@@ -1,3 +1,4 @@
+Outside, [13.09.2025 2:53]
 import logging
 import sqlite3
 import random
@@ -14,6 +15,11 @@ logging.basicConfig(
 
 # Токен бота (замените на свой)
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '7624971330:AAF5ubAHuOQ532clkZW8oBfjpF8e_Yq-IFc')
+
+# Константы
+FARM_COOLDOWN = 3600  # 1 час в секундах
+MIN_STARS = 1
+MAX_STARS = 2
 
 # Инициализация базы данных
 def init_db():
@@ -71,21 +77,22 @@ def update_user(user_id, chat_id, **kwargs):
 
 # Расчет стоимости улучшения
 def get_upgrade_cost(level):
-    return level * 10
+    return level * 5  # Уменьшил стоимость улучшения
 
 # Проверка времени для фарма
 def can_farm(last_farm_time):
     current_time = time.time()
-    return current_time - last_farm_time >= 1800  # 30 минут в секундах
+    return current_time - last_farm_time >= FARM_COOLDOWN
 
 # Получение оставшегося времени
 def get_remaining_time(last_farm_time):
     current_time = time.time()
     elapsed = current_time - last_farm_time
-    remaining = max(0, 1800 - elapsed)
-    minutes = int(remaining // 60)
+    remaining = max(0, FARM_COOLDOWN - elapsed)
+    hours = int(remaining // 3600)
+    minutes = int((remaining % 3600) // 60)
     seconds = int(remaining % 60)
-    return f"{minutes:02d}:{seconds:02d}"
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -107,14 +114,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(
         f"Привет, {user.first_name}! Добро пожаловать в бот звезд!\n\n"
-        "Каждые 30 минут ты можешь получать случайное количество звезд (0-10) с помощью команды /farm.\n"
+        "Каждый час ты можешь получать от 1 до 2 звезд с помощью команды /farm.\n"
         "Накопи звезды и улучшай свой множитель!",
         reply_markup=reply_markup
     )
 
 # Обработчик команды /farm
 async def farm(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
+
+Outside, [13.09.2025 2:53]
+user = update.effective_user
     chat = update.effective_chat
     
     if chat.type == 'private':
@@ -127,12 +136,12 @@ async def farm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not can_farm(last_farm_time):
         remaining = get_remaining_time(last_farm_time)
         await update.message.reply_text(
-            f"⏰ Вы уже фармили recently! Попробуйте снова через {remaining}"
+            f"⏰ Вы уже фармили недавно! Попробуйте снова через {remaining}"
         )
         return
     
-    # Генерируем звёзды
-    base_stars = random.randint(0, 10)
+    # Генерируем звёзды (1-2)
+    base_stars = random.randint(MIN_STARS, MAX_STARS)
     multiplier = user_data[5]
     actual_stars = int(base_stars * multiplier)
     new_stars = user_data[4] + actual_stars
@@ -142,18 +151,11 @@ async def farm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     update_user(user.id, chat.id, stars=new_stars, last_farm_time=current_time)
     
     # Формируем сообщение
-    if actual_stars > 0:
-        message = (
-            f"🌟 {user.first_name} получил {actual_stars} звёзд!\n"
-            f"📊 База: {base_stars} | Множитель: x{multiplier}\n"
-            f"💰 Теперь у вас: {new_stars} звёзд"
-        )
-    else:
-        message = (
-            f"😢 {user.first_name}, вы не получили звёзд в этот раз!\n"
-            f"📊 Множитель: x{multiplier}\n"
-            f"💰 Ваш баланс: {new_stars} звёзд"
-        )
+    message = (
+        f"🌟 {user.first_name} получил {actual_stars} звёзд!\n"
+        f"📊 База: {base_stars} | Множитель: x{multiplier}\n"
+        f"💰 Теперь у вас: {new_stars} звёзд"
+    )
     
     keyboard = [
         [InlineKeyboardButton("🌟 Профиль", callback_data=f"profile_{user.id}")],
@@ -193,14 +195,14 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     if stars >= upgrade_cost:
-        keyboard.insert(1, [InlineKeyboardButton(f"⚡ Улучшить множитель ({upgrade_cost} звёзд)", callback_data=f"upgrade_{user.id}")])
+        keyboard.insert(1, [InlineKeyboardButton(f"⚡️ Улучшить множитель ({upgrade_cost} звёзд)", callback_data=f"upgrade_{user.id}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
         f"🌟 Профиль {user.first_name}\n\n"
         f"✨ Звёзды: {stars}\n"
-        f"⚡ Множитель: x{multiplier}\n"
+        f"⚡️ Множитель: x{multiplier}\n"
         f"📊 Уровень: {level}\n"
         f"💎 Следующее улучшение: {upgrade_cost} звёзд\n"
         f"⏰ {farm_status}",
@@ -228,7 +230,9 @@ async def toplist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if chat.type == 'private':
         await update.message.reply_text("Эта команда работает только в групповых чатах!")
-        return
+
+Outside, [13.09.2025 2:53]
+return
     
     conn = sqlite3.connect('stars_bot.db')
     cursor = conn.cursor()
@@ -340,18 +344,20 @@ async def handle_profile(query, user, chat):
     keyboard = [
         [InlineKeyboardButton("🌾 Фармить звёзды", callback_data=f"farm_{user.id}")],
         [InlineKeyboardButton("🔄 Обновить", callback_data=f"profile_{user.id}")],
-        [InlineKeyboardButton("🏆 Топ игроков", callback_data="toplist")]
+
+Outside, [13.09.2025 2:53]
+[InlineKeyboardButton("🏆 Топ игроков", callback_data="toplist")]
     ]
     
     if stars >= upgrade_cost:
-        keyboard.insert(1, [InlineKeyboardButton(f"⚡ Улучшить множитель ({upgrade_cost} звёзд)", callback_data=f"upgrade_{user.id}")])
+        keyboard.insert(1, [InlineKeyboardButton(f"⚡️ Улучшить множитель ({upgrade_cost} звёзд)", callback_data=f"upgrade_{user.id}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(
         f"🌟 Профиль {user.first_name}\n\n"
         f"✨ Звёзды: {stars}\n"
-        f"⚡ Множитель: x{multiplier}\n"
+        f"⚡️ Множитель: x{multiplier}\n"
         f"📊 Уровень: {level}\n"
         f"💎 Следующее улучшение: {upgrade_cost} звёзд\n"
         f"⏰ {farm_status}",
@@ -368,8 +374,8 @@ async def handle_farm(query, user, chat):
         await query.answer(f"Подождите ещё {remaining}!", show_alert=True)
         return
     
-    # Генерируем звёзды
-    base_stars = random.randint(0, 10)
+    # Генерируем звёзды (1-2)
+    base_stars = random.randint(MIN_STARS, MAX_STARS)
     multiplier = user_data[5]
     actual_stars = int(base_stars * multiplier)
     new_stars = user_data[4] + actual_stars
@@ -379,18 +385,11 @@ async def handle_farm(query, user, chat):
     update_user(user.id, chat.id, stars=new_stars, last_farm_time=current_time)
     
     # Формируем сообщение
-    if actual_stars > 0:
-        message = (
-            f"🌟 {user.first_name} получил {actual_stars} звёзд!\n"
-            f"📊 База: {base_stars} | Множитель: x{multiplier}\n"
-            f"💰 Теперь у вас: {new_stars} звёзд"
-        )
-    else:
-        message = (
-            f"😢 {user.first_name}, вы не получили звёзд в этот раз!\n"
-            f"📊 Множитель: x{multiplier}\n"
-            f"💰 Ваш баланс: {new_stars} звёзд"
-        )
+    message = (
+        f"🌟 {user.first_name} получил {actual_stars} звёзд!\n"
+        f"📊 База: {base_stars} | Множитель: x{multiplier}\n"
+        f"💰 Теперь у вас: {new_stars} звёзд"
+    )
     
     keyboard = [
         [InlineKeyboardButton("🌟 Профиль", callback_data=f"profile_{user.id}")],
@@ -410,7 +409,7 @@ async def handle_upgrade(query, user, chat):
     if stars >= upgrade_cost:
         new_stars = stars - upgrade_cost
         new_level = level + 1
-        new_multiplier = round(1.0 + (new_level - 1) * 0.2, 1)
+        new_multiplier = round(1.0 + (new_level - 1) * 0.1, 1)  # +0.1 за уровень
         
         update_user(user.id, chat.id, stars=new_stars, level=new_level, multiplier=new_multiplier)
         
