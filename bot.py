@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Flask сервер для поддержания работы на Render
-app = Flask(name)
+app = Flask(__name__)
 
 @app.route('/')
 def home():
