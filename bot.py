@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Flask сервер для поддержания работы на Render
-app = Flask(__name__)
+app = Flask(__name__)  # Исправлено здесь
 
 @app.route('/')
 def home():
@@ -353,7 +353,8 @@ async def handle_confirm_reset(query, user, chat, context):
             [InlineKeyboardButton("🏠 В главное меню", callback_data=f"profile_{user.id}")]
         ])
     )
-    # Обработчик отмены сброса
+
+# Обработчик отмены сброса
 async def handle_cancel_reset(query):
     await query.edit_message_text(
         "✅ Сброс статистики отменен.\n"
@@ -575,5 +576,5 @@ def main():
     # Запуск бота
     application.run_polling()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
