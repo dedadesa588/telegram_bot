@@ -3,8 +3,25 @@ import sqlite3
 import random
 import time
 import os
+from flask import Flask
+from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+
+# Flask сервер для поддержания работы на Render
+app = Flask(name)
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+
+# Запускаем Flask в отдельном потоке
+flask_thread = Thread(target=run_flask)
+flask_thread.daemon = True
+flask_thread.start()
 
 # Настройка логирования
 logging.basicConfig(
@@ -12,7 +29,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Токен бота (замените на свой)
+# Токен бота из переменных окружения
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '7624971330:AAF5ubAHuOQ532clkZW8oBfjpF8e_Yq-IFc')
 
 # Константы
