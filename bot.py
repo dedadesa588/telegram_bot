@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # Flask сервер для поддержания работы на Render
-app = Flask(__name__)  # Исправлено здесь
+app = Flask(__name__)
 
 @app.route('/')
 def home():
@@ -574,6 +574,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button_handler))
     
     # Запуск бота
+    print("Бот запущен...")
     application.run_polling()
 
 if __name__ == '__main__':
